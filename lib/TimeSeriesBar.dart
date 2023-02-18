@@ -1,83 +1,147 @@
-/// Example of a time series chart using a bar renderer.
-import 'package:charts_flutter/flutter.dart' as charts;
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:charts_flutter/flutter.dart' as charts;
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
-class TimeSeriesBar extends StatelessWidget {
-  final List<charts.Series<TimeSeriesSales, DateTime>> seriesList;
-  final bool animate;
+class TimeSeriesBar extends StatefulWidget {
+  @override
+  _TimeSeriesBarState createState() => _TimeSeriesBarState();
+}
 
-  // ignore: prefer_const_constructors_in_immutables, use_key_in_widget_constructors
-  TimeSeriesBar(this.seriesList, {required this.animate});
+class _TimeSeriesBarState extends State<TimeSeriesBar> {
+  late Timer _timer;
 
-  /// Creates a [TimeSeriesChart] with sample data and no transition.
-  factory TimeSeriesBar.withSampleData() {
-    return new TimeSeriesBar(
-      _createSampleData(),
-      // Disable animations for image tests.
-      animate: false,
-    );
+  final List<Data> _buffer = [
+    Data(time: 1, value: 2),
+    Data(time: 1, value: 2),
+    Data(time: 1, value: 2),
+    Data(time: 1, value: 4),
+    Data(time: 1, value: 2),
+    Data(time: 16, value: 2),
+    Data(time: 1, value: 2),
+    Data(time: 1, value: 8),
+    Data(time: 5, value: 2),
+  ];
+  final List<Data> _buffer2 = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(
+        const Duration(milliseconds: 400), (Timer t) => _getData());
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  List<charts.Series<Data, String>> _createSampleData() {
+    return [
+      charts.Series<Data, String>(
+        id: 'Data',
+        domainFn: (Data data, _) => data.time.toString(),
+        measureFn: (Data data, _) => data.value,
+        data: _buffer,
+      ),
+    ];
+  }
+
+  List<charts.Series<Data, int>> _createSampleData2() {
+    int maxX = _buffer2.isNotEmpty ? _buffer2.last.time : 0;
+    int minY = _buffer2.isNotEmpty ? _buffer2.first.value : 0;
+    int maxY = _buffer2.isNotEmpty ? _buffer2.first.value : 0;
+
+    for (var data in _buffer2) {
+      if (data.value < minY) {
+        minY = data.value;
+      }
+      if (data.value > maxY) {
+        maxY = data.value;
+      }
+    }
+
+    return [
+      charts.Series<Data, int>(
+        id: 'Data',
+        domainFn: (Data data, _) => data.time,
+        measureFn: (Data data, _) => data.value,
+        data: _buffer2,
+        domainLowerBoundFn: (Data data, _) => _buffer2.first.time,
+      )
+    ];
   }
 
   @override
   Widget build(BuildContext context) {
-    return new charts.TimeSeriesChart(
-      seriesList,
-      animate: animate,
-      // Set the default renderer to a bar renderer.
-      // This can also be one of the custom renderers of the time series chart.
-      defaultRenderer: new charts.BarRendererConfig<DateTime>(),
-      // It is recommended that default interactions be turned off if using bar
-      // renderer, because the line point highlighter is the default for time
-      // series chart.
-      defaultInteractions: false,
-      // If default interactions were removed, optionally add select nearest
-      // and the domain highlighter that are typical for bar charts.
-      behaviors: [new charts.SelectNearest(), new charts.DomainHighlighter()],
+    return Center(
+      child: Column(
+        children: <Widget>[
+          Expanded(
+            child: charts.LineChart(
+              _createSampleData2(),
+              animate: true,
+            ),
+          ),
+          Expanded(
+            child: charts.BarChart(
+              _createSampleData(), animate: true,
+              domainAxis: const charts.OrdinalAxisSpec(
+                renderSpec: charts.SmallTickRendererSpec(
+                  labelStyle: charts.TextStyleSpec(
+                    fontSize: 0,
+                    color: charts.MaterialPalette.black,
+                  ),
+                ),
+              ),
+              // domainAxis: charts.NoTicksAxisSpec<String>();,
+            ),
+          )
+        ],
+      ),
     );
   }
 
-  /// Create one series with sample hard coded data.
-  static List<charts.Series<TimeSeriesSales, DateTime>> _createSampleData() {
-    final data = [
-      new TimeSeriesSales(new DateTime(2017, 9, 1), 5),
-      new TimeSeriesSales(new DateTime(2017, 9, 2), 5),
-      new TimeSeriesSales(new DateTime(2017, 9, 3), 25),
-      new TimeSeriesSales(new DateTime(2017, 9, 4), 100),
-      new TimeSeriesSales(new DateTime(2017, 9, 5), 75),
-      new TimeSeriesSales(new DateTime(2017, 9, 6), 88),
-      new TimeSeriesSales(new DateTime(2017, 9, 7), 65),
-      new TimeSeriesSales(new DateTime(2017, 9, 8), 91),
-      new TimeSeriesSales(new DateTime(2017, 9, 9), 100),
-      new TimeSeriesSales(new DateTime(2017, 9, 10), 111),
-      new TimeSeriesSales(new DateTime(2017, 9, 11), 90),
-      new TimeSeriesSales(new DateTime(2017, 9, 12), 50),
-      new TimeSeriesSales(new DateTime(2017, 9, 13), 40),
-      new TimeSeriesSales(new DateTime(2017, 9, 14), 30),
-      new TimeSeriesSales(new DateTime(2017, 9, 15), 40),
-      new TimeSeriesSales(new DateTime(2017, 9, 16), 50),
-      new TimeSeriesSales(new DateTime(2017, 9, 17), 30),
-      new TimeSeriesSales(new DateTime(2017, 9, 18), 35),
-      new TimeSeriesSales(new DateTime(2017, 9, 19), 40),
-      new TimeSeriesSales(new DateTime(2017, 9, 20), 32),
-      new TimeSeriesSales(new DateTime(2017, 9, 21), 31),
-    ];
-
-    return [
-      new charts.Series<TimeSeriesSales, DateTime>(
-        id: 'Sales',
-        colorFn: (_, __) => charts.MaterialPalette.blue.shadeDefault,
-        domainFn: (TimeSeriesSales sales, _) => sales.time,
-        measureFn: (TimeSeriesSales sales, _) => sales.sales,
-        data: data,
-      )
-    ];
+  void _getData() async {
+    try {
+      final response =
+          await http.get(Uri.parse('http://192.168.29.48/dataSensor'));
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+        final data = Data.fromJson(jsonData);
+        _buffer.add(data);
+        _buffer2.add(data);
+        if (_buffer2.length > 100) {
+          _buffer2.removeAt(0);
+        }
+        if (_buffer.length > 40) {
+          _buffer.removeAt(0);
+        }
+        setState(() {
+          print("Buffer1: ${_buffer2.length}, Buffer2: ${_buffer.length}");
+          print(jsonData);
+        });
+      } else {
+        // throw Exception('Failed to load data');
+      }
+    } catch (e) {
+      print('Error: $e');
+    }
   }
 }
 
-/// Sample time series data type.
-class TimeSeriesSales {
-  final DateTime time;
-  final int sales;
+class Data {
+  final int time;
+  final int value;
 
-  TimeSeriesSales(this.time, this.sales);
+  Data({required this.time, required this.value});
+
+  factory Data.fromJson(Map<String, dynamic> json) {
+    return Data(
+      time: json['time'],
+      value: json['value'],
+    );
+  }
 }
